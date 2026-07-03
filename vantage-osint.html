@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantage — OSINT &amp; Digital Footprint Console</title>
+<meta name="description" content="Eleven intelligence modules. One console. Pay only for the queries you run.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#05070A;
+    --surface:#0A0E13;
+    --surface-2:#0F151B;
+    --surface-3:#151C24;
+    --line:rgba(154,224,197,0.09);
+    --line-strong:rgba(154,224,197,0.18);
+    --emerald:#34D399;
+    --emerald-dim:rgba(52,211,153,0.45);
+    --cyan:#4FD1E8;
+    --amber:#E0A94C;
+    --text:#E8EFEB;
+    --text-dim:#8B978F;
+    --text-faint:#525C56;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Manrope',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+    --ease:cubic-bezier(.16,.8,.24,1);
+    --s1:8px; --s2:14px; --s3:22px; --s4:36px; --s5:56px; --s6:88px; --s7:130px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;background:var(--void);color:var(--text);
+    font-family:var(--font-body);font-size:16px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--emerald);color:#04140D;}
+  a{color:inherit;text-decoration:none;}
+  img,svg{display:block;max-width:100%;}
+  h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0;letter-spacing:-0.01em;}
+  p{margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  :focus-visible{outline:2px solid var(--emerald);outline-offset:3px;}
+
+  .mono{font-family:var(--font-mono);}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 var(--s4);}
+  @media (max-width:640px){ .wrap{padding:0 var(--s3);} }
+
+  /* --- ambient grain --- */
+  .grain{
+    position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.035;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* --- cursor dot --- */
+  .cursor-dot{
+    position:fixed;top:0;left:0;width:16px;height:16px;border:1px solid var(--emerald-dim);border-radius:50%;
+    pointer-events:none;z-index:210;transform:translate(-50%,-50%);transition:width .2s var(--ease),height .2s var(--ease),border-color .2s ease;
+    mix-blend-mode:difference;
+  }
+  .cursor-dot::after{content:'';position:absolute;inset:0;margin:auto;width:2px;height:2px;background:var(--emerald);border-radius:50%;}
+  .cursor-dot.is-active{width:34px;height:34px;border-color:var(--emerald);}
+  @media (pointer:coarse){ .cursor-dot{display:none;} }
+
+  /* --- nav --- */
+  .nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px var(--s4);border-bottom:1px solid transparent;
+    background:linear-gradient(to bottom, rgba(5,7,10,.92), rgba(5,7,10,0));
+    transition:border-color .4s ease, background .4s ease;
+  }
+  .nav.is-scrolled{border-bottom-color:var(--line);background:rgba(5,7,10,.86);backdrop-filter:blur(10px);}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:-.01em;}
+  .brand svg{width:22px;height:22px;}
+  .brand .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald);animation:blink 2.6s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+  .nav-links{display:flex;align-items:center;gap:var(--s4);}
+  .nav-links a{font-size:13.5px;color:var(--text-dim);letter-spacing:.01em;transition:color .25s ease;position:relative;}
+  .nav-links a:hover{color:var(--text);}
+  .nav-links a::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:1px;background:var(--emerald);transform:scaleX(0);transform-origin:right;transition:transform .3s var(--ease);}
+  .nav-links a:hover::after{transform:scaleX(1);transform-origin:left;}
+  .nav-right{display:flex;align-items:center;gap:var(--s3);}
+  .nav-status{display:none;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.06em;}
+  @media (min-width:1080px){ .nav-status{display:flex;} }
+  .nav-status .dot{width:5px;height:5px;border-radius:50%;background:var(--emerald);animation:blink 2.6s ease-in-out infinite;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12.5px;letter-spacing:.03em;
+    padding:11px 18px;border-radius:3px;border:1px solid var(--line-strong);color:var(--text);
+    transition:border-color .3s ease, background .3s ease, transform .3s var(--ease);
+  }
+  .btn:hover{border-color:var(--emerald-dim);transform:translateY(-1px);}
+  .btn.primary{background:var(--emerald);color:#04140D;border-color:var(--emerald);font-weight:600;}
+  .btn.primary:hover{background:#3fe0a4;box-shadow:0 8px 24px rgba(52,211,153,.22);}
+  .btn.ghost{border-color:transparent;padding-left:0;}
+  .nav-toggle{display:none;background:none;border:1px solid var(--line-strong);width:38px;height:38px;border-radius:3px;color:var(--text);align-items:center;justify-content:center;}
+  @media (max-width:880px){
+    .nav-links{position:fixed;top:68px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--line);flex-direction:column;align-items:flex-start;padding:var(--s3) var(--s4);gap:var(--s2);transform:translateY(-12px);opacity:0;pointer-events:none;transition:opacity .3s ease, transform .3s ease;}
+    .nav-links.is-open{opacity:1;transform:translateY(0);pointer-events:auto;}
+    .nav-toggle{display:flex;}
+    .nav-right .btn.primary{display:none;}
+  }
+
+  /* --- hero --- */
+  .hero{position:relative;padding:calc(var(--s7) + 40px) 0 var(--s6);overflow:hidden;border-bottom:1px solid var(--line);}
+  .hero-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.85;}
+  .hero-grid{
+    position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:56px 56px;
+    -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 30%, #000 10%, transparent 75%);
+            mask-image:radial-gradient(ellipse 70% 60% at 50% 30%, #000 10%, transparent 75%);
+  }
+  .hero-fade{position:absolute;left:0;right:0;bottom:0;height:220px;background:linear-gradient(to bottom, transparent, var(--void));pointer-events:none;}
+  .hero-content{position:relative;z-index:2;max-width:760px;}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--emerald);padding:7px 12px 7px 10px;border:1px solid var(--line-strong);border-radius:20px;margin-bottom:var(--s3);
+  }
+  .eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--emerald);animation:blink 2.4s ease-in-out infinite;}
+  .headline{font-size:clamp(38px, 6vw, 68px);line-height:1.04;font-weight:600;min-height:1.1em;}
+  .headline span{display:inline-block;}
+  .headline.decoded span{color:var(--text);}
+  .headline .accent{color:var(--emerald);}
+  .sub{margin-top:var(--s3);font-size:17px;line-height:1.65;color:var(--text-dim);max-width:520px;}
+  .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s4);}
+
+  .term{margin-top:var(--s5);max-width:480px;border:1px solid var(--line-strong);border-radius:6px;background:rgba(10,14,19,.75);backdrop-filter:blur(6px);overflow:hidden;}
+  .term-bar{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);}
+  .term-bar span{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+  .term-title{margin-left:8px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);letter-spacing:.04em;}
+  .term-body{padding:14px 14px 16px;font-family:var(--font-mono);font-size:12.5px;color:var(--text-dim);}
+  .term-line .prompt{color:var(--emerald);}
+  .term-line{white-space:pre-wrap;word-break:break-all;}
+  .cursor-blink{display:inline-block;width:6px;height:13px;background:var(--emerald);vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+
+  /* --- reveal --- */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s var(--ease), transform .8s var(--ease);transition-delay:var(--d,0s);}
+  .reveal.is-in{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){
+    .reveal{opacity:1;transform:none;transition:none;}
+  }
+
+  /* --- ticker --- */
+  .ticker{border-bottom:1px solid var(--line);background:var(--surface);overflow:hidden;padding:13px 0;}
+  .ticker-track{display:flex;gap:48px;width:max-content;animation:scrollTicker 32s linear infinite;}
+  @keyframes scrollTicker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  .ticker-item{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:12px;color:var(--text-faint);letter-spacing:.03em;white-space:nowrap;}
+  .ticker-item b{color:var(--text-dim);font-weight:500;}
+  .ticker-item .sep{color:var(--line-strong);}
+  @media (prefers-reduced-motion:reduce){ .ticker-track{animation:none;} }
+
+  /* --- section shell --- */
+  section{padding:var(--s7) 0;}
+  .sec-head{max-width:640px;margin-bottom:var(--s5);}
+  .sec-head .eyebrow{margin-bottom:var(--s2);}
+  .sec-head h2{font-size:clamp(28px,3.6vw,40px);line-height:1.15;}
+  .sec-head p{margin-top:var(--s2);color:var(--text-dim);font-size:16px;max-width:520px;}
+
+  /* --- modules index --- */
+  .modules{border-bottom:1px solid var(--line);}
+  .module-index{border-top:1px solid var(--line);}
+  .module-row{
+    position:relative;display:grid;grid-template-columns:64px 1fr auto auto;align-items:center;gap:var(--s3);
+    padding:22px 18px;border-bottom:1px solid var(--line);overflow:hidden;transition:padding-left .35s ease;
+  }
+  .module-row:hover{padding-left:30px;}
+  .module-row::before{content:'';position:absolute;top:0;left:-40%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(52,211,153,.07),transparent);transition:left .7s ease;pointer-events:none;}
+  .module-row:hover::before{left:120%;}
+  .module-row::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--emerald);transform:scaleY(0);transform-origin:bottom;transition:transform .35s ease;}
+  .module-row:hover::after{transform:scaleY(1);}
+  .mod-id{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);letter-spacing:.02em;}
+  .mod-main{display:flex;align-items:center;gap:16px;min-width:0;}
+  .mod-icon{flex:none;width:38px;height:38px;border:1px solid var(--line-strong);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--emerald);transition:border-color .3s ease, background .3s ease;}
+  .module-row:hover .mod-icon{border-color:var(--emerald-dim);background:rgba(52,211,153,.06);}
+  .mod-icon svg{width:18px;height:18px;}
+  .mod-text h3{font-size:16.5px;font-weight:600;}
+  .mod-text p{margin-top:3px;font-size:13.5px;color:var(--text-dim);}
+  .mod-cost{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);border:1px solid var(--line-strong);padding:5px 10px;border-radius:20px;white-space:nowrap;}
+  .mod-arrow{color:var(--text-faint);transition:transform .3s var(--ease), color .3s ease;}
+  .module-row:hover .mod-arrow{transform:translateX(4px);color:var(--emerald);}
+  .mod-arrow svg{width:16px;height:16px;}
+  @media (max-width:760px){
+    .module-row{grid-template-columns:40px 1fr;grid-template-areas:"id main" ". cost";row-gap:10px;}
+    .mod-id{grid-area:id;}
+    .mod-main{grid-area:main;}
+    .mod-cost{grid-area:cost;justify-self:start;}
+    .mod-arrow{display:none;}
+  }
+
+  /* --- trust strip --- */
+  .trust{border-bottom:1px solid var(--line);}
+  .trust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);}
+  .trust-item{background:var(--void);padding:var(--s4);}
+  .trust-item .mono{font-size:11px;color:var(--emerald);letter-spacing:.08em;}
+  .trust-item p{margin-top:8px;font-size:14.5px;color:var(--text-dim);line-height:1.55;}
+
+  /* --- pricing ledger --- */
+  .pricing{border-bottom:1px solid var(--line);}
+  .ledger{border-top:1px solid var(--line);}
+  .ledger-row{
+    display:grid;grid-template-columns:140px 120px 1fr auto;align-items:center;gap:var(--s3);
+    padding:24px 18px;border-bottom:1px solid var(--line);position:relative;
+  }
+  .ledger-row.is-featured{background:linear-gradient(90deg, rgba(52,211,153,.05), transparent 60%);}
+  .ledger-row.is-featured::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--emerald);}
+  .ledger-tier{display:flex;flex-direction:column;gap:4px;}
+  .ledger-tier .name{font-family:var(--font-display);font-size:17px;font-weight:600;}
+  .ledger-tier .tag{font-family:var(--font-mono);font-size:10px;color:var(--emerald);letter-spacing:.08em;}
+  .ledger-price{font-family:var(--font-mono);}
+  .ledger-price .amount{font-size:24px;color:var(--text);}
+  .ledger-price .credits{display:block;font-size:11.5px;color:var(--text-faint);margin-top:3px;}
+  .ledger-features{display:flex;flex-wrap:wrap;gap:8px;}
+  .feat-pill{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);border:1px solid var(--line-strong);padding:5px 10px;border-radius:20px;}
+  .ledger-row .btn{white-space:nowrap;}
+  @media (max-width:820px){
+    .ledger-row{grid-template-columns:1fr;row-gap:14px;}
+  }
+  .ledger-note{margin-top:var(--s3);font-size:13.5px;color:var(--text-faint);}
+
+  /* --- cta band --- */
+  .cta-band{
+    position:relative;overflow:hidden;border-bottom:1px solid var(--line);
+    background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:44px 44px;
+  }
+  .cta-band::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 90% at 50% 50%, rgba(52,211,153,.08), transparent 70%);}
+  .cta-inner{position:relative;text-align:center;max-width:600px;margin:0 auto;}
+  .cta-inner h2{font-size:clamp(28px,4vw,42px);}
+  .cta-inner p{margin-top:var(--s2);color:var(--text-dim);font-size:16px;}
+  .cta-row{display:flex;justify-content:center;gap:var(--s2);margin-top:var(--s4);flex-wrap:wrap;}
+
+  /* --- footer --- */
+  footer{padding:var(--s6) 0 var(--s4);}
+  .foot-top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:var(--s5);padding-bottom:var(--s5);border-bottom:1px solid var(--line);}
+  @media (max-width:820px){ .foot-top{grid-template-columns:1fr 1fr;} }
+  .foot-brand .brand{margin-bottom:var(--s2);}
+  .foot-brand p{font-size:13.5px;color:var(--text-dim);max-width:280px;line-height:1.6;}
+  .foot-status{display:flex;align-items:center;gap:8px;margin-top:var(--s3);font-family:var(--font-mono);font-size:11px;color:var(--emerald);letter-spacing:.06em;}
+  .foot-status .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald);animation:blink 2.4s ease-in-out infinite;}
+  .foot-col h4{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:var(--s2);}
+  .foot-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+  .foot-col a{font-size:13.5px;color:var(--text-dim);transition:color .25s ease;}
+  .foot-col a:hover{color:var(--emerald);}
+  .foot-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:var(--s3);flex-wrap:wrap;gap:12px;}
+  .foot-bottom p{font-size:12px;color:var(--text-faint);}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+
+<nav class="nav" id="siteNav">
+  <a href="#top" class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21"/></svg>
+    Vantage <span class="dot"></span>
+  </a>
+  <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <div class="nav-links" id="navLinks">
+    <a href="#modules">Modules</a>
+    <a href="#access">Access</a>
+    <a href="#trust">Method</a>
+    <a href="#top" class="btn primary" style="margin-top:6px;">Launch Console</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-status"><span class="dot"></span> ALL SYSTEMS OPERATIONAL</span>
+    <a href="#access" class="btn primary">Launch Console</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <canvas class="hero-canvas" id="netCanvas"></canvas>
+  <div class="hero-grid"></div>
+  <div class="wrap">
+    <div class="hero-content">
+      <span class="eyebrow"><span class="dot"></span> OSINT &amp; Digital Footprint Console</span>
+      <h1 class="headline" id="decodeHeadline" data-text="See what the internet already knows.">See what the internet already knows.</h1>
+      <p class="sub">Eleven intelligence modules in one console — usernames, emails, IPs, domains, images, and more. Run a query, pay for the query, keep the result. No subscriptions.</p>
+      <div class="hero-cta">
+        <a href="#access" class="btn primary">Launch Console →</a>
+        <a href="#modules" class="btn ghost">Browse 11 modules</a>
+      </div>
+
+      <div class="term reveal">
+        <div class="term-bar"><span></span><span></span><span></span><span class="term-title">intel-console — zsh</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@vantage:~$</span> <span id="termText"></span><span class="cursor-blink"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-fade"></div>
+</header>
+
+<div class="ticker">
+  <div class="ticker-track" id="tickerTrack">
+    <!-- duplicated in JS for seamless loop -->
+    <span class="ticker-item"><b>11</b> active modules <span class="sep">/</span></span>
+    <span class="ticker-item">avg. response <b>1.8s</b> <span class="sep">/</span></span>
+    <span class="ticker-item">zero data retention on lookups <span class="sep">/</span></span>
+    <span class="ticker-item">pay-per-query <span class="sep">·</span> credits never expire <span class="sep">/</span></span>
+    <span class="ticker-item">encrypted in transit <span class="sep">·</span> TLS 1.3 <span class="sep">/</span></span>
+    <span class="ticker-item">built for researchers &amp; analysts <span class="sep">/</span></span>
+  </div>
+</div>
+
+<section class="modules" id="modules">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span> Intelligence Modules</span>
+      <h2>Eleven modules. One console.</h2>
+      <p>Each module runs independently and costs only what it uses. No bundles, no wasted credits.</p>
+    </div>
+
+    <div class="module-index">
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x01</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg></span>
+          <div class="mod-text"><h3>Username Lookup</h3><p>Trace a handle across 40+ platforms in one pass.</p></div>
+        </div>
+        <span class="mod-cost mono">1 credit</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x02</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></svg></span>
+          <div class="mod-text"><h3>Email Intelligence</h3><p>Deliverability, breach history, and linked accounts.</p></div>
+        </div>
+        <span class="mod-cost mono">2 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x03</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8M12 3.6c2.4 2.3 3.6 5.2 3.6 8.4s-1.2 6.1-3.6 8.4c-2.4-2.3-3.6-5.2-3.6-8.4S9.6 5.9 12 3.6z"/></svg></span>
+          <div class="mod-text"><h3>IP Lookup</h3><p>Geolocation, ASN, and threat reputation for any address.</p></div>
+        </div>
+        <span class="mod-cost mono">1 credit</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x04</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="8" r="2.6"/><circle cx="17" cy="16" r="2.6"/><path d="M9.2 9.6l5.6 4.8"/></svg></span>
+          <div class="mod-text"><h3>Domain &amp; DNS</h3><p>Full WHOIS, DNS records, and subdomain enumeration.</p></div>
+        </div>
+        <span class="mod-cost mono">2 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x05</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 18h4"/></svg></span>
+          <div class="mod-text"><h3>Phone Lookup</h3><p>Carrier, line type, and registered region for any number.</p></div>
+        </div>
+        <span class="mod-cost mono">2 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x06</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><rect x="13.5" y="13.5" width="7" height="7"/></svg></span>
+          <div class="mod-text"><h3>Metadata Analyzer</h3><p>Extract EXIF, authorship, and hidden file metadata.</p></div>
+        </div>
+        <span class="mod-cost mono">1 credit</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x07</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.2"/><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/></svg></span>
+          <div class="mod-text"><h3>Reverse Image Search</h3><p>Find every place an image has surfaced online.</p></div>
+        </div>
+        <span class="mod-cost mono">3 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x08</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M7.6 8.6L10.6 15.4M16.4 8.6L13.4 15.4M8.2 7H15.8"/></svg></span>
+          <div class="mod-text"><h3>Social Media Search</h3><p>Cross-reference profiles, posts, and mutual connections.</p></div>
+        </div>
+        <span class="mod-cost mono">3 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x09</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s7-6.1 7-11.6A7 7 0 0 0 5 9.4C5 14.9 12 21 12 21z"/><circle cx="12" cy="9.4" r="2.3"/></svg></span>
+          <div class="mod-text"><h3>Geolocation</h3><p>Pinpoint coordinates from images, IPs, or landmark cues.</p></div>
+        </div>
+        <span class="mod-cost mono">2 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x0A</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3.2v5.4c0 4.8-3 8.4-7 9.4-4-1-7-4.6-7-9.4V6.2L12 3z"/><path d="M9.2 12l2 2 3.6-4"/></svg></span>
+          <div class="mod-text"><h3>Threat Intelligence</h3><p>Check indicators against live feeds and blocklists.</p></div>
+        </div>
+        <span class="mod-cost mono">4 credits</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+      <div class="module-row reveal">
+        <span class="mod-id mono">0x0B</span>
+        <div class="mod-main">
+          <span class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 3L7 21M17 3l-2 18M3.5 9h17M2.5 15h17"/></svg></span>
+          <div class="mod-text"><h3>Hash &amp; Encoding Utilities</h3><p>Compute, decode, and identify hashes and encodings.</p></div>
+        </div>
+        <span class="mod-cost mono">1 credit</span>
+        <span class="mod-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="trust" id="trust">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span> Method</span>
+      <h2>Built the way analysts actually work.</h2>
+    </div>
+    <div class="trust-grid reveal">
+      <div class="trust-item">
+        <span class="mono">01 · SOURCES</span>
+        <p>Every module pulls from public, licensed, or opt-in sources only. No scraping behind logins.</p>
+      </div>
+      <div class="trust-item">
+        <span class="mono">02 · RETENTION</span>
+        <p>Query inputs are discarded after the result is returned. We keep the receipt, not the search.</p>
+      </div>
+      <div class="trust-item">
+        <span class="mono">03 · SPEED</span>
+        <p>Median response time across all eleven modules is under two seconds.</p>
+      </div>
+      <div class="trust-item">
+        <span class="mono">04 · USE</span>
+        <p>Built for research, journalism, due diligence, and personal footprint audits — not surveillance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing" id="access">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span> Access</span>
+      <h2>Pay as you go. Buy credits, use anytime.</h2>
+      <p>No subscriptions, no monthly minimums. Credits apply to all eleven modules and never expire.</p>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-row reveal">
+        <div class="ledger-tier"><span class="name">Starter</span><span class="tag mono">ENTRY</span></div>
+        <div class="ledger-price"><span class="amount">₹19</span><span class="credits">2 credits</span></div>
+        <div class="ledger-features">
+          <span class="feat-pill">All 11 modules</span>
+          <span class="feat-pill">Instant activation</span>
+          <span class="feat-pill">No expiry</span>
+        </div>
+        <a href="#" class="btn">Buy credits</a>
+      </div>
+
+      <div class="ledger-row reveal">
+        <div class="ledger-tier"><span class="name">Basic</span><span class="tag mono">STANDARD</span></div>
+        <div class="ledger-price"><span class="amount">₹29</span><span class="credits">4 credits</span></div>
+        <div class="ledger-features">
+          <span class="feat-pill">All 11 modules</span>
+          <span class="feat-pill">Instant activation</span>
+          <span class="feat-pill">No expiry</span>
+        </div>
+        <a href="#" class="btn">Buy credits</a>
+      </div>
+
+      <div class="ledger-row is-featured reveal">
+        <div class="ledger-tier"><span class="name">Standard</span><span class="tag mono">[ RECOMMENDED ]</span></div>
+        <div class="ledger-price"><span class="amount">₹49</span><span class="credits">8 credits</span></div>
+        <div class="ledger-features">
+          <span class="feat-pill">All 11 modules</span>
+          <span class="feat-pill">Instant activation</span>
+          <span class="feat-pill">No expiry</span>
+          <span class="feat-pill">Best value / credit</span>
+        </div>
+        <a href="#" class="btn primary">Buy credits</a>
+      </div>
+
+      <div class="ledger-row reveal">
+        <div class="ledger-tier"><span class="name">Pro</span><span class="tag mono">HIGH VOLUME</span></div>
+        <div class="ledger-price"><span class="amount">₹99</span><span class="credits">18 credits</span></div>
+        <div class="ledger-features">
+          <span class="feat-pill">All 11 modules</span>
+          <span class="feat-pill">Instant activation</span>
+          <span class="feat-pill">No expiry</span>
+        </div>
+        <a href="#" class="btn">Buy credits</a>
+      </div>
+    </div>
+    <p class="ledger-note mono reveal">Prices in INR. Credits are deducted per module per query — see cost listed in each module above.</p>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="wrap">
+    <div class="cta-inner reveal">
+      <h2>Run your first query.</h2>
+      <p>Two credits and thirty seconds is usually enough to know if you need module three.</p>
+      <div class="cta-row">
+        <a href="#access" class="btn primary">Launch Console →</a>
+        <a href="#modules" class="btn">See all modules</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a href="#top" class="brand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21"/></svg>
+          Vantage
+        </a>
+        <p>An OSINT console for researchers, journalists, and analysts. Eleven modules, one query at a time.</p>
+        <div class="foot-status"><span class="dot"></span> ALL SYSTEMS OPERATIONAL</div>
+      </div>
+      <div class="foot-col">
+        <h4>Modules</h4>
+        <ul>
+          <li><a href="#modules">Username Lookup</a></li>
+          <li><a href="#modules">Email Intelligence</a></li>
+          <li><a href="#modules">IP Lookup</a></li>
+          <li><a href="#modules">Domain &amp; DNS</a></li>
+          <li><a href="#modules">View all 11 →</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Platform</h4>
+        <ul>
+          <li><a href="#access">Access &amp; credits</a></li>
+          <li><a href="#trust">Method</a></li>
+          <li><a href="#">Documentation</a></li>
+          <li><a href="#">Status page</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacy policy</a></li>
+          <li><a href="#">Terms of use</a></li>
+          <li><a href="#">Responsible use policy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>© 2026 Vantage. Built for lawful research and due diligence only.</p>
+      <p>root@vantage:~$ <span class="cursor-blink" style="width:5px;height:11px;"></span></p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- nav scroll state + mobile toggle ---------- */
+  var nav = document.getElementById('siteNav');
+  window.addEventListener('scroll', function(){
+    nav.classList.toggle('is-scrolled', window.scrollY > 12);
+  }, { passive:true });
+
+  var navToggle = document.getElementById('navToggle');
+  var navLinks = document.getElementById('navLinks');
+  navToggle.addEventListener('click', function(){
+    var open = navLinks.classList.toggle('is-open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  navLinks.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){ navLinks.classList.remove('is-open'); });
+  });
+
+  /* ---------- cursor dot ---------- */
+  var cursorDot = document.getElementById('cursorDot');
+  if (window.matchMedia('(pointer:fine)').matches){
+    window.addEventListener('mousemove', function(e){
+      cursorDot.style.left = e.clientX + 'px';
+      cursorDot.style.top = e.clientY + 'px';
+    });
+    document.querySelectorAll('a, button, .module-row').forEach(function(el){
+      el.addEventListener('mouseenter', function(){ cursorDot.classList.add('is-active'); });
+      el.addEventListener('mouseleave', function(){ cursorDot.classList.remove('is-active'); });
+    });
+  } else {
+    cursorDot.style.display = 'none';
+  }
+
+  /* ---------- headline decode effect ---------- */
+  var headEl = document.getElementById('decodeHeadline');
+  if (headEl){
+    var final = headEl.dataset.text || headEl.textContent;
+    var glyphs = "!<>-_\\/[]{}=+*^?#$%";
+    if (reduceMotion){
+      headEl.classList.add('decoded');
+    } else {
+      var chars = final.split('');
+      headEl.textContent = '';
+      var spans = chars.map(function(ch){
+        var s = document.createElement('span');
+        s.textContent = ch === ' ' ? '\u00A0' : glyphs[Math.floor(Math.random()*glyphs.length)];
+        headEl.appendChild(s);
+        return s;
+      });
+      var resolveIndex = 0;
+      var iv = setInterval(function(){
+        spans.forEach(function(s, i){
+          if (i < resolveIndex){
+            s.textContent = chars[i] === ' ' ? '\u00A0' : chars[i];
+          } else if (chars[i] !== ' '){
+            s.textContent = glyphs[Math.floor(Math.random()*glyphs.length)];
+          }
+        });
+        resolveIndex++;
+        if (resolveIndex > spans.length){
+          clearInterval(iv);
+          headEl.classList.add('decoded');
+        }
+      }, 34);
+    }
+  }
+
+  /* ---------- terminal typewriter ---------- */
+  var termEl = document.getElementById('termText');
+  var termLines = [
+    'lookup --email target@domain.com',
+    'trace --username ghost_operator',
+    'scan --ip 185.23.14.9 --threat-check',
+    'whois --domain example.net'
+  ];
+  if (termEl){
+    if (reduceMotion){
+      termEl.textContent = termLines[0];
+    } else {
+      var li = 0, ci = 0, deleting = false;
+      (function typeTick(){
+        var full = termLines[li];
+        if (!deleting){
+          ci++;
+          termEl.textContent = full.slice(0, ci);
+          if (ci === full.length){ deleting = true; setTimeout(typeTick, 1500); return; }
+        } else {
+          ci--;
+          termEl.textContent = full.slice(0, ci);
+          if (ci === 0){ deleting = false; li = (li + 1) % termLines.length; }
+        }
+        setTimeout(typeTick, deleting ? 20 : 36);
+      })();
+    }
+  }
+
+  /* ---------- ticker: duplicate content for seamless loop ---------- */
+  var track = document.getElementById('tickerTrack');
+  if (track){ track.innerHTML += track.innerHTML; }
+
+  /* ---------- scroll reveal ---------- */
+  var revealEls = document.querySelectorAll('.reveal');
+  revealEls.forEach(function(el, i){
+    el.style.setProperty('--d', (Math.min(i % 6, 5) * 0.06) + 's');
+  });
+  if ('IntersectionObserver' in window){
+    var ro = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting){ en.target.classList.add('is-in'); ro.unobserve(en.target); }
+      });
+    }, { threshold:0.12, rootMargin:'0px 0px -40px 0px' });
+    revealEls.forEach(function(el){ ro.observe(el); });
+  } else {
+    revealEls.forEach(function(el){ el.classList.add('is-in'); });
+  }
+
+  /* ---------- hero network canvas ---------- */
+  var canvas = document.getElementById('netCanvas');
+  if (canvas && canvas.getContext){
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, DPR = 1;
+
+    var clusters = [
+      { cx:.15, cy:.36, r:.085, n:15 },
+      { cx:.27, cy:.68, r:.06,  n:9  },
+      { cx:.50, cy:.24, r:.05,  n:8  },
+      { cx:.53, cy:.55, r:.09,  n:13 },
+      { cx:.72, cy:.30, r:.12,  n:18 },
+      { cx:.85, cy:.72, r:.045, n:6  }
+    ];
+    var dots = [];
+    clusters.forEach(function(c){
+      for (var i = 0; i < c.n; i++){
+        var a = Math.random() * Math.PI * 2;
+        var r = Math.random() * c.r;
+        dots.push({ x:c.cx + Math.cos(a)*r, y:c.cy + Math.sin(a)*r*0.55 });
+      }
+    });
+    var hubs = [ {x:.15,y:.36}, {x:.72,y:.30}, {x:.53,y:.55}, {x:.85,y:.72} ];
+    var links = [[0,1],[1,2],[0,2],[1,3]];
+
+    var mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
+    window.addEventListener('mousemove', function(e){
+      var rect = canvas.getBoundingClientRect();
+      targetX = ((e.clientX - rect.left) / rect.width - 0.5) * 16;
+      targetY = ((e.clientY - rect.top) / rect.height - 0.5) * 16;
+    });
+
+    function resize(){
+      var rect = canvas.getBoundingClientRect();
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = rect.width * DPR;
+      canvas.height = rect.height * DPR;
+      W = rect.width; H = rect.height;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    var t = 0;
+    var hasConic = !!ctx.createConicGradient;
+
+    function frame(){
+      t += 0.006;
+      mouseX += (targetX - mouseX) * 0.04;
+      mouseY += (targetY - mouseY) * 0.04;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.translate(mouseX, mouseY);
+
+      ctx.fillStyle = 'rgba(154,224,197,0.32)';
+      dots.forEach(function(d){
+        ctx.beginPath();
+        ctx.arc(d.x * W, d.y * H, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      links.forEach(function(pair, idx){
+        var a = hubs[pair[0]], b = hubs[pair[1]];
+        var ax = a.x*W, ay = a.y*H, bx = b.x*W, by = b.y*H;
+        var mx = (ax+bx)/2, my = (ay+by)/2 - 46;
+        ctx.strokeStyle = 'rgba(79,209,232,0.28)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4,5]);
+        ctx.lineDashOffset = -t * 42 - idx * 12;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.quadraticCurveTo(mx, my, bx, by);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      hubs.forEach(function(h, i){
+        var hx = h.x*W, hy = h.y*H;
+        var pulse = (Math.sin(t*2 + i*1.7) + 1) / 2;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 3, 0, Math.PI*2);
+        ctx.fillStyle = '#34D399';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(hx, hy, 6 + pulse*12, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(52,211,153,' + (0.32*(1-pulse)) + ')';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      var rh = hubs[1];
+      var rx = rh.x*W, ry = rh.y*H, rr = Math.max(W,H)*0.4;
+      if (hasConic){
+        var grad = ctx.createConicGradient(t*1.1, rx, ry);
+        grad.addColorStop(0, 'rgba(79,209,232,0.20)');
+        grad.addColorStop(0.07, 'rgba(79,209,232,0)');
+        grad.addColorStop(1, 'rgba(79,209,232,0)');
+        ctx.beginPath();
+        ctx.moveTo(rx, ry);
+        ctx.arc(rx, ry, rr, 0, Math.PI*2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(79,209,232,0.10)';
+      [0.55, 0.78, 1].forEach(function(f){
+        ctx.beginPath();
+        ctx.arc(rx, ry, rr*f, 0, Math.PI*2);
+        ctx.stroke();
+      });
+
+      ctx.restore();
+      if (!reduceMotion) requestAnimationFrame(frame);
+    }
+    frame();
+  }
+})();
+</script>
+</body>
+</html>
